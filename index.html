@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Find My Kid App Demo</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+        integrity="sha256-sA+e2r/QCr6YfMLlPC8uyvYI+EudJQYvz6FZ8a6B+7E=" crossorigin="" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: #007acc;
+            color: #fff;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 1rem auto;
+            padding: 1rem;
+        }
+
+        .section {
+            background: #fff;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .map {
+            height: 400px;
+            width: 100%;
+            border: 2px solid #007acc;
+            margin-top: 1rem;
+            border-radius: 5px;
+        }
+
+        .controls {
+            margin: 1rem 0;
+        }
+
+        label {
+            margin-right: 1rem;
+        }
+
+        input[type="text"] {
+            padding: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007acc;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #005fa3;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Find My Kid – Demo</h1>
+        <p>Simulating Child (tracking & sharing location) and Parent (live tracking & safe zone) modes</p>
+    </header>
+    <div class="container">
+        <!-- Mode Selection -->
+        <div class="controls">
+            <label>
+                <input type="radio" name="mode" value="child" id="modeChild" checked />
+                Child Mode
+            </label>
+            <label>
+                <input type="radio" name="mode" value="parent" id="modeParent" />
+                Parent Mode
+            </label>
+        </div>
+
+        <!-- Child Mode Section -->
+        <div id="childSection" class="section">
+            <h2>Child Mode</h2>
+            <div class="controls">
+                <label for="childId">Child ID:</label>
+                <input type="text" id="childId" placeholder="Enter a unique ID" />
+            </div>
+            <div class="controls">
+                <button id="startChildTracking">Start Tracking</button>
+                <button id="stopChildTracking" disabled>Stop Tracking</button>
+            </div>
+            <div id="childInfo">
+                <p>Latitude: <span id="childLat">N/A</span></p>
+                <p>Longitude: <span id="childLng">N/A</span></p>
+                <p>Accuracy: <span id="childAccuracy">N/A</span></p>
+                <p>Timestamp: <span id="childTimestamp">N/A</span></p>
+            </div>
+            <div id="childMap" class="map"></div>
+        </div>
+
+        <!-- Parent Mode Section -->
+        <div id="parentSection" class="section hidden">
+            <h2>Parent Mode</h2>
+            <div class="controls">
+                <label for="trackChildId">Child ID to Track:</label>
+                <input type="text" id="trackChildId" placeholder="Enter Child ID" />
+                <button id="startParentTracking">Start Tracking Child</button>
+                <button id="stopParentTracking" disabled>Stop Tracking Child</button>
+            </div>
+            <div class="controls">
+                <label for="safeZoneRadius">Safe Zone Radius (m):</label>
+                <input type="text" id="safeZoneRadius" placeholder="e.g., 100" />
+                <button id="setSafeZone">Set Safe Zone</button>
+            </div>
+            <div id="parentInfo">
+                <p>Child Latitude: <span id="parentChildLat">N/A</span></p>
+                <p>Child Longitude: <span id="parentChildLng">N/A</span></p>
+                <p>Last Updated: <span id="parentChildTimestamp">N/A</span></p>
+                <p>Safe Zone Status: <span id="safeZoneStatus">Not Set</span></p>
+            </div>
+            <div id="parentMap" class="map"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs (using compat versions for simplicity) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+        integrity="sha256-o9N1j7kN6E2gXhYh6k/dkX1uMzjGEX8L6C4BM7F2L8g=" crossorigin=""></script>
+    <script>
+        /***** Firebase Setup *****/
+        // Replace the following config object with your own Firebase project credentials
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        /***** Mode Toggle *****/
+        const modeChildRadio = document.getElementById('modeChild');
+        const modeParentRadio = document.getElementById('modeParent');
+        const childSection = document.getElementById('childSection');
+        const parentSection = document.getElementById('parentSection');
+
+        modeChildRadio.addEventListener('change', function () {
+            if (this.checked) {
+                childSection.classList.remove('hidden');
+                parentSection.classList.add('hidden');
+            }
+        });
+        modeParentRadio.addEventListener('change', function () {
+            if (this.checked) {
+                parentSection.classList.remove('hidden');
+                childSection.classList.add('hidden');
+            }
+        });
+
+        /***** CHILD MODE CODE *****/
+        let childWatchId = null;
+        let childMap, childMarker;
+        const childIdInput = document.getElementById('childId');
+        const childLatSpan = document.getElementById('childLat');
+        const childLngSpan = document.getElementById('childLng');
+        const childAccuracySpan = document.getElementById('childAccuracy');
+        const childTimestampSpan = document.getElementById('childTimestamp');
+
+        // Initialize (or update) the child’s map with current location
+        function initChildMap(lat, lng) {
+            if (!childMap) {
+                childMap = L.map('childMap').setView([lat, lng], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(childMap);
+                childMarker = L.marker([lat, lng]).addTo(childMap)
+                    .bindPopup("Your Current Location")
+                    .openPopup();
+            } else {
+                childMap.setView([lat, lng]);
+                childMarker.setLatLng([lat, lng]);
+            }
+        }
+
+        // Start tracking child’s location and send updates to Firebase
+        document.getElementById('startChildTracking').addEventListener('click', function () {
+            const childId = childIdInput.value.trim();
+            if (!childId) {
+                alert("Please enter a valid Child ID.");
+                return;
+            }
+            if (navigator.geolocation) {
+                childWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude, accuracy } = position.coords;
+                        const timestamp = position.timestamp;
+                        // Update Child UI
+                        childLatSpan.textContent = latitude.toFixed(6);
+                        childLngSpan.textContent = longitude.toFixed(6);
+                        childAccuracySpan.textContent = accuracy + " m";
+                        childTimestampSpan.textContent = new Date(timestamp).toLocaleTimeString();
+                        initChildMap(latitude, longitude);
+                        // Write location data to Firebase under "child-locations/{childId}"
+                        database.ref('child-locations/' + childId).set({
+                            latitude: latitude,
+                            longitude: longitude,
+                            accuracy: accuracy,
+                            timestamp: timestamp
+                        });
+                    },
+                    (error) => {
+                        alert("Error getting location: " + error.message);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                );
+                document.getElementById('startChildTracking').disabled = true;
+                document.getElementById('stopChildTracking').disabled = false;
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        });
+
+        // Stop tracking child’s location
+        document.getElementById('stopChildTracking').addEventListener('click', function () {
+            if (childWatchId !== null) {
+                navigator.geolocation.clearWatch(childWatchId);
+                childWatchId = null;
+                document.getElementById('startChildTracking').disabled = false;
+                document.getElementById('stopChildTracking').disabled = true;
+            }
+        });
+
+        /***** PARENT MODE CODE *****/
+        let parentMap, parentMarker, parentPolyline, parentRoute = [];
+        let safeZoneCircle = null;
+        let safeZoneRadius = 0;
+        let firebaseListener = null;
+        const trackChildIdInput = document.getElementById('trackChildId');
+        const parentChildLatSpan = document.getElementById('parentChildLat');
+        const parentChildLngSpan = document.getElementById('parentChildLng');
+        const parentChildTimestampSpan = document.getElementById('parentChildTimestamp');
+        const safeZoneStatusSpan = document.getElementById('safeZoneStatus');
+
+        // Initialize (or update) the parent's map with the child's location
+        function initParentMap(lat, lng) {
+            if (!parentMap) {
+                parentMap = L.map('parentMap').setView([lat, lng], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(parentMap);
+                parentMarker = L.marker([lat, lng]).addTo(parentMap)
+                    .bindPopup("Child's Location")
+                    .openPopup();
+                parentPolyline = L.polyline([], { color: 'blue' }).addTo(parentMap);
+            } else {
+                parentMap.setView([lat, lng]);
+                parentMarker.setLatLng([lat, lng]);
+            }
+            // Save the location for route tracing
+            parentRoute.push([lat, lng]);
+            parentPolyline.setLatLngs(parentRoute);
+        }
+
+        // Check whether the child's location is within the safe zone (if set)
+        function checkSafeZone(lat, lng) {
+            if (safeZoneCircle) {
+                const center = safeZoneCircle.getLatLng();
+                const distance = parentMap.distance(center, L.latLng(lat, lng));
+                if (distance > safeZoneRadius) {
+                    safeZoneStatusSpan.textContent = "Child is outside safe zone!";
+                    safeZoneStatusSpan.style.color = "red";
+                } else {
+                    safeZoneStatusSpan.textContent = "Child is inside safe zone.";
+                    safeZoneStatusSpan.style.color = "green";
+                }
+            }
+        }
+
+        // Start tracking the child's location from Firebase
+        document.getElementById('startParentTracking').addEventListener('click', function () {
+            const childIdToTrack = trackChildIdInput.value.trim();
+            if (!childIdToTrack) {
+                alert("Please enter a valid Child ID to track.");
+                return;
+            }
+            firebaseListener = database.ref('child-locations/' + childIdToTrack);
+            firebaseListener.on('value', function (snapshot) {
+                const data = snapshot.val();
+                if (data) {
+                    const { latitude, longitude, timestamp } = data;
+                    parentChildLatSpan.textContent = latitude.toFixed(6);
+                    parentChildLngSpan.textContent = longitude.toFixed(6);
+                    parentChildTimestampSpan.textContent = new Date(timestamp).toLocaleTimeString();
+                    initParentMap(latitude, longitude);
+                    checkSafeZone(latitude, longitude);
+                }
+            });
+            document.getElementById('startParentTracking').disabled = true;
+            document.getElementById('stopParentTracking').disabled = false;
+        });
+
+        // Stop tracking the child’s location from Firebase
+        document.getElementById('stopParentTracking').addEventListener('click', function () {
+            const childIdToTrack = trackChildIdInput.value.trim();
+            if (firebaseListener) {
+                database.ref('child-locations/' + childIdToTrack).off('value', firebaseListener);
+                firebaseListener = null;
+            }
+            document.getElementById('startParentTracking').disabled = false;
+            document.getElementById('stopParentTracking').disabled = true;
+        });
+
+        // Set a safe zone (geofence) in Parent Mode based on the child’s current location
+        document.getElementById('setSafeZone').addEventListener('click', function () {
+            const radiusValue = parseFloat(document.getElementById('safeZoneRadius').value);
+            if (isNaN(radiusValue) || radiusValue <= 0) {
+                alert("Please enter a valid safe zone radius in meters.");
+                return;
+            }
+            safeZoneRadius = radiusValue;
+            if (parentMarker) {
+                const currentPos = parentMarker.getLatLng();
+                if (safeZoneCircle) {
+                    parentMap.removeLayer(safeZoneCircle);
+                }
+                safeZoneCircle = L.circle(currentPos, {
+                    radius: safeZoneRadius,
+                    color: 'red',
+                    fillOpacity: 0.1
+                }).addTo(parentMap);
+                safeZoneStatusSpan.textContent = "Safe zone set. Waiting for location updates...";
+            }
+        });
+    </script>
+</body>
+
+</html>
