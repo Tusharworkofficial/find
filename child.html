@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Child Page - Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+    
+</head>
+
+<body>
+    <div class="container">
+        <!-- Enhanced Navbar -->
+        <nav class="navbar">
+          <a href="#" class="logo">FindMyKid</a>
+          <!-- Hamburger menu icon for mobile view -->
+          <div class="hamburger" id="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <ul class="nav-links" id="nav-links">
+            <li><a href="child.html">Child Page</a></li>
+            <li><a href="parent.html">Parent Page</a></li>
+          </ul>
+        </nav>
+        <h1>Child Page</h1>
+        <div id="loginDiv">
+            <h2>Login</h2>
+            <form id="childLoginForm">
+                <label for="childId">ID:</label>
+                <input type="text" id="childId" required><br>
+                <label for="childPassword">Password:</label>
+                <input type="password" id="childPassword" required><br>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+        <div id="trackingDiv" style="display:none;">
+            <p>Tracking started...</p>
+            <p id="locationDisplay"></p>
+        </div>
+        <script src="script-child.js"></script>
+        <script src="navbar.js"></script>
+</body>
+
+</html>

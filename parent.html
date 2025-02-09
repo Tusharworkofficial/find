@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Parent Page - Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+    
+
+</head>
+
+<body>
+    <div class="container">
+        <!-- Enhanced Navbar -->
+        <nav class="navbar">
+          <a href="#" class="logo">FindMyKid</a>
+          <!-- Hamburger menu icon for mobile view -->
+          <div class="hamburger" id="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <ul class="nav-links" id="nav-links">
+            <li><a href="child.html">Child Page</a></li>
+            <li><a href="parent.html">Parent Page</a></li>
+          </ul>
+        </nav>
+        <h1>Parent Page</h1>
+        <div id="loginDiv">
+            <h2>Login</h2>
+            <form id="parentLoginForm">
+                <label for="parentId">Child ID:</label>
+                <input type="text" id="parentId" required><br>
+                <label for="parentPassword">Password:</label>
+                <input type="password" id="parentPassword" required><br>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+        <div id="trackingDiv" style="display:none;">
+            <h2>Child's Location and Audio</h2>
+            <div id="map"></div>
+            <p id="childLocation"></p>
+            <audio id="childAudio" controls></audio>
+        </div>
+
+        <!-- Load the Google Maps API. Replace YOUR_API_KEY with your actual API key. -->
+        <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+        <script src="script-parent.js"></script>
+        <script src="navbar.js"></script>
+</body>
+
+</html>
