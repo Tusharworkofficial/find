@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Location Tracking Demo</title>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-sA+e2r/QCr6YfMLlPC8uyvYI+EudJQYvz6FZ8a6B+7E="
+    crossorigin=""
+  />
+  <style>
+    /* Basic CSS styling */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f2f2f2;
+    }
+    header {
+      background-color: #007acc;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    .container {
+      max-width: 800px;
+      margin: 1rem auto;
+      padding: 1rem;
+      background: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background-color: #007acc;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fa3;
+    }
+    label {
+      font-size: 0.9rem;
+      margin-left: 10px;
+    }
+    .info {
+      background: #eef;
+      border: 1px solid #ccd;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      margin-bottom: 1rem;
+    }
+    .info p {
+      margin: 0.3rem 0;
+    }
+    #map {
+      height: 500px;
+      width: 100%;
+      border: 2px solid #007acc;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Live Location Tracking Demo</h1>
+  </header>
+  <div class="container">
+    <!-- Controls for tracking and auto-centering -->
+    <div class="controls">
+      <button id="startTracking">Start Tracking</button>
+      <button id="stopTracking" disabled>Stop Tracking</button>
+      <label>
+        <input type="checkbox" id="autoCenter" checked />
+        Auto Center Map
+      </label>
+    </div>
+
+    <!-- Location information display -->
+    <div class="info" id="locationInfo">
+      <p>Latitude: <span id="lat">N/A</span></p>
+      <p>Longitude: <span id="lng">N/A</span></p>
+      <p>Accuracy: <span id="accuracy">N/A</span></p>
+      <p>Speed: <span id="speed">N/A</span></p>
+      <p>Timestamp: <span id="timestamp">N/A</span></p>
+    </div>
+
+    <!-- Map container -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-o9N1j7kN6E2gXhYh6k/dkX1uMzjGEX8L6C4BM7F2L8g="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // Global variables for map, marker, route polyline, and geolocation watch ID
+    let map, marker, routePolyline;
+    let watchId = null;
+    let routeCoordinates = []; // To store the sequence of coordinates
+
+    // Function to initialize or update the map and marker
+    function initOrUpdateMap(lat, lng) {
+      if (!map) {
+        // Create the map and set the initial view
+        map = L.map('map').setView([lat, lng], 16);
+        // Use OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+        // Create a marker for current location
+        marker = L.marker([lat, lng]).addTo(map)
+          .bindPopup("Current Location")
+          .openPopup();
+        // Initialize the route polyline with the first point
+        routeCoordinates.push([lat, lng]);
+        routePolyline = L.polyline(routeCoordinates, { color: 'blue' }).addTo(map);
+      } else {
+        // If auto-centering is enabled, recenter the map
+        if (document.getElementById('autoCenter').checked) {
+          map.setView([lat, lng], map.getZoom());
+        }
+        // Update the marker's position
+        marker.setLatLng([lat, lng]);
+        // Add the new point to the route and update the polyline
+        routeCoordinates.push([lat, lng]);
+        routePolyline.setLatLngs(routeCoordinates);
+      }
+    }
+
+    // Function to update location details on the page
+    function updateLocationInfo(position) {
+      const { latitude, longitude, accuracy, speed } = position.coords;
+      document.getElementById('lat').textContent = latitude.toFixed(6);
+      document.getElementById('lng').textContent = longitude.toFixed(6);
+      document.getElementById('accuracy').textContent = accuracy + " meters";
+      document.getElementById('speed').textContent =
+        speed !== null ? speed + " m/s" : "N/A";
+      document.getElementById('timestamp').textContent =
+        new Date(position.timestamp).toLocaleTimeString();
+    }
+
+    // Callback for every geolocation update
+    function handlePositionUpdate(position) {
+      const { latitude, longitude } = position.coords;
+      updateLocationInfo(position);
+      initOrUpdateMap(latitude, longitude);
+    }
+
+    // Error handler for geolocation errors
+    function handleLocationError(error) {
+      let message = "";
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message = "Permission denied. Please allow location access.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          message = "Location information is unavailable.";
+          break;
+        case error.TIMEOUT:
+          message = "The request to get user location timed out.";
+          break;
+        default:
+          message = "An unknown error occurred.";
+          break;
+      }
+      alert("Error: " + message);
+    }
+
+    // Start continuous tracking using watchPosition
+    function startTracking() {
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          handlePositionUpdate,
+          handleLocationError,
+          {
+            enableHighAccuracy: true, // Use high-accuracy mode if available
+            maximumAge: 0,            // Do not use cached location
+            timeout: 5000             // 5 seconds timeout per update
+          }
+        );
+        // Disable start button and enable stop button
+        document.getElementById('startTracking').disabled = true;
+        document.getElementById('stopTracking').disabled = false;
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    }
+
+    // Stop continuous tracking
+    function stopTracking() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        // Re-enable the start button and disable the stop button
+        document.getElementById('startTracking').disabled = false;
+        document.getElementById('stopTracking').disabled = true;
+      }
+    }
+
+    // Event listeners for the control buttons
+    document.getElementById('startTracking').addEventListener('click', startTracking);
+    document.getElementById('stopTracking').addEventListener('click', stopTracking);
+  </script>
+</body>
+</html>
